@@ -7,6 +7,5 @@ batch_jobs/**
 *batch_jobs*.py
 submit_jobs.sh
 cluster_logs
-**.sh
 **.out
 **.err

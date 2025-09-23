@@ -22,6 +22,81 @@ logger = logging.getLogger(__name__)
 
 
 class RoboAugmentor:
+    """
+    RoboAugmentor applies data augmentations to robot learning datasets, focusing on
+    image overlays (background randomization) and mirroring (symmetry-based augmentation)
+    for both observations and actions.
+
+    This class is designed for visuomotor policy learning, where robust and equivariant
+    representations are crucial. It supports augmentation of:
+      - **Image observations** (background overlay, horizontal flip)
+      - **Proprioception states** (position, rotation, gripper state)
+      - **Actions** (position, rotation, gripper action)
+
+    Augmentation Modes
+    ------------------
+    1. Overlay Augmentation:
+       - Randomly replaces image backgrounds with external images.
+       - Blends original and background images with a configurable alpha.
+       - Warmup scheduling gradually increases augmentation probability and blending.
+
+    2. Mirror Augmentation:
+       - `batch_wise`: Flips images, proprioception, and actions in-place
+         with a given probability.
+       - `action_only`: Mirrors only actions, duplicating the batch by
+         interleaving original and mirrored actions.
+       - `batch_wise_plus_action_only`: First applies batch-wise mirroring,
+         then mirrors and interleaves actions.
+    Args:
+        shape_meta (Dict[str, Any]): Metadata describing dataset structure.
+            Must contain:
+                - `obs`: keys for observations (e.g., images, proprio states).
+                - `action`: key for actions.
+        configs (Optional[Dict[str, Any]]): Configuration for overlay and mirror augmentations.
+            Example structure:
+            {
+                "overlay": {
+                    "enable": True,
+                    "prob": 0.5,
+                    "blend_alpha": 0.5,
+                    "warmup_epochs": 10,
+                    "input_shape": [3, 84, 84],
+                    "background_path": "path/to/backgrounds"
+                },
+                "mirror": {
+                    "enable": True,
+                    "mode": "batch_wise",
+                    "prob": 0.5
+                }
+            }
+
+    Call Behavior:
+        robo_aug = RoboAugmentor(shape_meta, configs)
+        batch, overlay_idx, mirror_idx = robo_aug(batch, epoch_idx)
+
+        - `batch` is the augmented batch (obs + action).
+        - `overlay_idx` contains indices of trajectories that received overlay augmentation.
+        - `mirror_idx` contains indices of trajectories that were mirrored.
+
+    Raises:
+        ValueError: If required keys are missing from `shape_meta` or `batch`, 
+                    or if image normalization is invalid.
+        AssertionError: If configuration values are out of valid range.
+
+    Example:
+        >>> shape_meta = {
+        ...     "obs": {"agentview_image": [3, 84, 84], "robot0_pos": [3]},
+        ...     "action": [10],
+        ... }
+        >>> configs = {
+        ...     "overlay": {"enable": True, "prob": 0.5, "blend_alpha": 0.5,
+        ...                 "input_shape": [3, 84, 84], "background_path": "./bgs"},
+        ...     "mirror": {"enable": True, "mode": "batch_wise", "prob": 0.5}
+        ... }
+        >>> augmentor = RoboAugmentor(shape_meta, configs)
+        >>> augmented_batch, overlay_idx, mirror_idx = augmentor(batch, epoch_idx=5)
+    """
+
     def __init__(
         self,
         shape_meta: Dict[str, Any],

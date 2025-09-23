@@ -211,7 +211,7 @@ def mirror_object(X_C, obj_pos, obj_quat, rot_180=False):
 def mirror_object_placements(env, object_placements, mirror=False):
     if not mirror:
         return
-    X_C = env.get_agentview_extrincs()
+    X_C = env.get_agentview_extrinsics()
     for obj_pos, obj_quat, obj in object_placements.values():
         if mirror:
             obj_pos, obj_quat = mirror_object(X_C, obj_pos, obj_quat)
@@ -265,9 +265,9 @@ def extract_trajectory(env, initial_state, states, actions, mirror=False, reset_
 
     if mirror:
         try:
-            X_C = env.env.get_agentview_extrincs()
+            X_C = env.env.get_agentview_extrinsics()
         except AttributeError:
-            raise ValueError("env does not have get_agentview_extrincs method")
+            raise ValueError("env does not have get_agentview_extrinsics method")
         actions = mirror_actions(actions, X_C=X_C, action_mode="absolute")
         env.env.mirror_objects()
         env.env.sim.forward()

@@ -94,7 +94,7 @@ python mirrorduo/mirrorduo/scripts/convert_dataset_actions.py \
 #### 3. Prepare Random Backgrounds
 Add random images for **Random Overlay**:
 ```bash
-unzip backgrounds.zip -d data/
+unzip asset/backgrounds.zip -d data/
 ```
 
 ### 4. [Optional] Re-render Trajectories under a Mirrored Setup

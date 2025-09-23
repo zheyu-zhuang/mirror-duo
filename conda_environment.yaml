@@ -57,9 +57,9 @@ dependencies:
     - pygame
     - imagecodecs==2022.9.26
     - escnn @ https://github.com/pointW/escnn/archive/fc4714cb6dc0d2a32f9fcea35771968b89911109.tar.gz
-    - -e ./external/robosuite
-    - -e ./external/robomimic
-    - -e ./external/mimicgen
-    - -e ./external/equidiff
-    - mujoco==2.3.2
-    - -e mirrorduo
+    # - -e ./external/robosuite
+    # - -e ./external/robomimic
+    # - -e ./external/mimicgen
+    # - -e ./external/equidiff
+    # - mujoco==2.3.2
+    # - -e mirrorduo
