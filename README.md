@@ -80,9 +80,7 @@ The downloaded dataset uses a **relative pose** representation:
 - **Rotation**: expressed in the **world frame** as $R_t R_{t-1}^T$  
 - **Translation**: expressed as the **difference in positions** $T_t - T_{t-1}$  
 
-This differs from the **true relative action representation**, where the current pose is expressed in the **previous frame**.  
-
-This step converts dataset actions into the required **true relative action space**, as well as other action modes compatible with MirrorDuo.  
+This differs from the **true relative action representation**, where the current pose is expressed in the **previous frame**. This step converts dataset actions into the required **true relative action space**, as well as other action modes compatible with MirrorDuo.  
 
 ```bash
 python mirrorduo/mirrorduo/scripts/convert_dataset_actions.py \
@@ -101,8 +99,7 @@ unzip backgrounds.zip -d data/
 
 ### 4. [Optional] Re-render Trajectories under a Mirrored Setup
 
-This step **re-renders** the dataset in a mirrored workspace. Mirroring is applied directly during demonstration rendering to produce **actual mirrored demonstrations**.  
-These mirrored demonstrations can later be combined with the original (non-mirrored) data to evaluate data efficiency on one-sided tasks.
+This step **re-renders** the dataset in a mirrored workspace. Mirroring is applied directly during demonstration rendering to produce **actual mirrored demonstrations**. These mirrored demonstrations can later be combined with the original (non-mirrored) data to evaluate data efficiency on one-sided tasks.
 
 ```bash
 # Template
@@ -139,8 +136,7 @@ python mirrorduo/mirrorduo/scripts/rerender_demos.py \
 > `Agentview_Far` = demonstrations rendered with the agent-view camera positioned farther back.  
 
 ### 5. [Optional] Combine Mirrored Demos with the Original Demos
-You can combine original demonstrations with mirrored ones for training.  
-For example, if you have **200 original demos** and **50 mirrored demos**, you can later specify a total of **210 demos** during training (meaning 200 original + 10 mirrored).
+You can combine original demonstrations with mirrored ones for training. For example, if you have **200 original demos** and **50 mirrored demos**, you can later specify a total of **210 demos** during training (meaning 200 original + 10 mirrored).
 ```bash
 # Example
 python mirrorduo/mirrorduo/scripts/combine_datasets.py \
