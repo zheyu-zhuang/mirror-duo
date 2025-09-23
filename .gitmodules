@@ -1,12 +1,16 @@
 [submodule "external/equidiff"]
 	path = external/equidiff
 	url = https://github.com/pointW/equidiff
+	branch = e40abb003b25071d4e5b01bfa9933dc16cd32c67
 [submodule "external/robomimic"]
 	path = external/robomimic
 	url = https://github.com/ARISE-Initiative/robomimic
+	branch = d0b37cf214bd24fb590d182edb6384333f67b661
 [submodule "external/robosuite"]
 	path = external/robosuite
 	url = https://github.com/ARISE-Initiative/robosuite
+	branch = b9d8d3de5e3dfd1724f4a0e6555246c460407daa
 [submodule "external/mimicgen"]
 	path = external/mimicgen
 	url = https://github.com/NVlabs/mimicgen
+	branch = d360d1d10225f3ff3cf7cf74db1cdbf9a2b79ecb
