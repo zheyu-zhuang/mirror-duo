@@ -1,0 +1,28 @@
+diff --git a/robomimic/macros.py b/robomimic/macros.py
+index 3b6c050..4cd3327 100644
+--- a/robomimic/macros.py
++++ b/robomimic/macros.py
+@@ -15,13 +15,13 @@ WANDB_ENTITY = None
+ # alternatively, set up wandb from terminal with `wandb login`
+ WANDB_API_KEY = None
+ 
+-try:
+-    from robomimic.macros_private import *
+-except ImportError:
+-    from robomimic.utils.log_utils import log_warning
+-    import robomimic
+-    log_warning(
+-        "No private macro file found!"\
+-        "\nIt is recommended to use a private macro file"\
+-        "\nTo setup, run: python {}/scripts/setup_macros.py".format(robomimic.__path__[0])
+-    )
++# try:
++#     from robomimic.macros_private import *
++# except ImportError:
++#     from robomimic.utils.log_utils import log_warning
++#     import robomimic
++#     log_warning(
++#         "No private macro file found!"\
++#         "\nIt is recommended to use a private macro file"\
++#         "\nTo setup, run: python {}/scripts/setup_macros.py".format(robomimic.__path__[0])
++#     )

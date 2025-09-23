@@ -1,0 +1,12 @@
+/data
+/experiments
+**/*.egg-info
+**/__pycache__/
+*.mp4
+batch_jobs/** 
+*batch_jobs*.py
+submit_jobs.sh
+cluster_logs
+**.sh
+**.out
+**.err

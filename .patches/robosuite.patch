@@ -1,0 +1,442 @@
+diff --git a/pyproject.toml b/pyproject.toml
+deleted file mode 100644
+index 6871e11a..00000000
+--- a/pyproject.toml
++++ /dev/null
+@@ -1,15 +0,0 @@
+-[tool.black]
+-line-length = 120
+-target-version = ["py36", "py37", "py38"]
+-extend-exclude = "robosuite/((models/assets)|(controllers/config))"
+-
+-[tool.isort]
+-profile = "black"
+-line_length = 120
+-skip = ["__init__.py"]
+-filter_files = true
+-py_version = "all"
+-extend_skip = [
+-    "robosuite/models/assets",
+-    "robosuite/controllers/config",
+-]
+diff --git a/robosuite/controllers/osc.py b/robosuite/controllers/osc.py
+index a45843d0..554586e9 100644
+--- a/robosuite/controllers/osc.py
++++ b/robosuite/controllers/osc.py
+@@ -5,6 +5,7 @@ import numpy as np
+ import robosuite.utils.transform_utils as T
+ from robosuite.controllers.base_controller import Controller
+ from robosuite.utils.control_utils import *
++from mirrorduo.utils import HOME_X
+ 
+ # Supported impedance modes
+ IMPEDANCE_MODES = {"fixed", "variable", "variable_kp"}
+@@ -127,6 +128,8 @@ class OperationalSpaceController(Controller):
+         interpolator_ori=None,
+         control_ori=True,
+         control_delta=True,
++        true_relative=False,
++        true_delta=False,
+         uncouple_pos_ori=True,
+         **kwargs,  # does nothing; used so no error raised when dict is passed with extra terms used previously
+     ):
+@@ -141,7 +144,7 @@ class OperationalSpaceController(Controller):
+         self.use_ori = control_ori
+ 
+         # Determine whether we want to use delta or absolute values as inputs
+-        self.use_delta = control_delta
++        self.use_relative = control_delta
+ 
+         # Control dimension
+         self.control_dim = 6 if self.use_ori else 3
+@@ -166,7 +169,9 @@ class OperationalSpaceController(Controller):
+         # Verify the proposed impedance mode is supported
+         assert impedance_mode in IMPEDANCE_MODES, (
+             "Error: Tried to instantiate OSC controller for unsupported "
+-            "impedance mode! Inputted impedance mode: {}, Supported modes: {}".format(impedance_mode, IMPEDANCE_MODES)
++            "impedance mode! Inputted impedance mode: {}, Supported modes: {}".format(
++                impedance_mode, IMPEDANCE_MODES
++            )
+         )
+ 
+         # Impedance mode
+@@ -179,8 +184,12 @@ class OperationalSpaceController(Controller):
+             self.control_dim += 6
+ 
+         # limits
+-        self.position_limits = np.array(position_limits) if position_limits is not None else position_limits
+-        self.orientation_limits = np.array(orientation_limits) if orientation_limits is not None else orientation_limits
++        self.position_limits = (
++            np.array(position_limits) if position_limits is not None else position_limits
++        )
++        self.orientation_limits = (
++            np.array(orientation_limits) if orientation_limits is not None else orientation_limits
++        )
+ 
+         # control frequency
+         self.control_freq = policy_freq
+@@ -199,6 +208,20 @@ class OperationalSpaceController(Controller):
+         self.relative_ori = np.zeros(3)
+         self.ori_ref = None
+ 
++        self.true_relative = true_relative
++        self.true_delta = true_delta
++        # check:
++        if self.true_relative and self.true_delta:
++            raise ValueError("Cannot use both true_relative and true_delta at the same time!")
++        if self.true_relative:
++            assert (
++                self.use_relative
++            ), "true_relative is only valid when 'control_delta' set to True"
++        if self.true_delta:
++            assert (
++                not self.use_relative
++            ), "true_delta is only valid when 'control_delta' set to False"
++
+     def set_goal(self, action, set_pos=None, set_ori=None):
+         """
+         Sets goal based on input @action. If self.impedance_mode is not "fixed", then the input will be parsed into the
+@@ -223,7 +246,11 @@ class OperationalSpaceController(Controller):
+         if self.impedance_mode == "variable":
+             damping_ratio, kp, delta = action[:6], action[6:12], action[12:]
+             self.kp = np.clip(kp, self.kp_min, self.kp_max)
+-            self.kd = 2 * np.sqrt(self.kp) * np.clip(damping_ratio, self.damping_ratio_min, self.damping_ratio_max)
++            self.kd = (
++                2
++                * np.sqrt(self.kp)
++                * np.clip(damping_ratio, self.damping_ratio_min, self.damping_ratio_max)
++            )
+         elif self.impedance_mode == "variable_kp":
+             kp, delta = action[:6], action[6:]
+             self.kp = np.clip(kp, self.kp_min, self.kp_max)
+@@ -232,7 +259,7 @@ class OperationalSpaceController(Controller):
+             delta = action
+ 
+         # If we're using deltas, interpret actions as such
+-        if self.use_delta:
++        if self.use_relative:
+             if delta is not None:
+                 scaled_delta = self.scale_action(delta)
+                 if not self.use_ori and set_ori is None:
+@@ -252,24 +279,49 @@ class OperationalSpaceController(Controller):
+                     else np.array([[0.0, 1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0]])
+                 )
+             # No scaling of values since these are absolute values
++            if self.true_delta:
++
++                X0 = np.array(HOME_X["robomimic"], dtype=np.float32)
++                R0 = X0[:3, :3]
++                t0 = X0[:3, 3]
++                set_ori = R0 @ set_ori
++                set_pos = R0 @ set_pos + t0
++
+             scaled_delta = delta
+ 
+         # We only want to update goal orientation if there is a valid delta ori value OR if we're using absolute ori
+         # use math.isclose instead of numpy because numpy is slow
+-        bools = [0.0 if math.isclose(elem, 0.0) else 1.0 for elem in scaled_delta[3:]]
+-        if sum(bools) > 0.0 or set_ori is not None:
+-            self.goal_ori = set_goal_orientation(
+-                scaled_delta[3:], self.ee_ori_mat, orientation_limit=self.orientation_limits, set_ori=set_ori
++        if self.true_relative:
++            goal_ori_true_rel, goal_pos_true_rel = set_goal_pose_from_relative_actions(
++                scaled_delta,
++                current_orientation=self.ee_ori_mat,
++                current_position=self.ee_pos,
++                orientation_limit=self.orientation_limits,
++                position_limit=self.position_limits,
++                set_ori=set_ori,
++                set_pos=set_pos,
++            )
++            self.goal_ori = goal_ori_true_rel
++            self.goal_pos = goal_pos_true_rel
++        else:
++            bools = [0.0 if math.isclose(elem, 0.0) else 1.0 for elem in scaled_delta[3:]]
++            if sum(bools) > 0.0 or set_ori is not None:
++                self.goal_ori = set_goal_orientation(
++                    scaled_delta[3:],
++                    self.ee_ori_mat,
++                    orientation_limit=self.orientation_limits,
++                    set_ori=set_ori,
++                )
++            self.goal_pos = set_goal_position(
++                scaled_delta[:3], self.ee_pos, position_limit=self.position_limits, set_pos=set_pos
+             )
+-        self.goal_pos = set_goal_position(
+-            scaled_delta[:3], self.ee_pos, position_limit=self.position_limits, set_pos=set_pos
+-        )
+-
+         if self.interpolator_pos is not None:
+             self.interpolator_pos.set_goal(self.goal_pos)
+ 
+         if self.interpolator_ori is not None:
+-            self.ori_ref = np.array(self.ee_ori_mat)  # reference is the current orientation at start
++            self.ori_ref = np.array(
++                self.ee_ori_mat
++            )  # reference is the current orientation at start
+             self.interpolator_ori.set_goal(
+                 orientation_error(self.goal_ori, self.ori_ref)
+             )  # goal is the total orientation error
+@@ -316,9 +368,9 @@ class OperationalSpaceController(Controller):
+         vel_pos_error = -self.ee_pos_vel
+ 
+         # F_r = kp * pos_err + kd * vel_err
+-        desired_force = np.multiply(np.array(position_error), np.array(self.kp[0:3])) + np.multiply(
+-            vel_pos_error, self.kd[0:3]
+-        )
++        desired_force = np.multiply(
++            np.array(position_error), np.array(self.kp[0:3])
++        ) + np.multiply(vel_pos_error, self.kd[0:3])
+ 
+         vel_ori_error = -self.ee_ori_vel
+ 
+@@ -376,7 +428,9 @@ class OperationalSpaceController(Controller):
+             self.interpolator_pos.set_goal(self.goal_pos)
+ 
+         if self.interpolator_ori is not None:
+-            self.ori_ref = np.array(self.ee_ori_mat)  # reference is the current orientation at start
++            self.ori_ref = np.array(
++                self.ee_ori_mat
++            )  # reference is the current orientation at start
+             self.interpolator_ori.set_goal(
+                 orientation_error(self.goal_ori, self.ori_ref)
+             )  # goal is the total orientation error
+diff --git a/robosuite/macros.py b/robosuite/macros.py
+index c49c84b6..c5f9e190 100644
+--- a/robosuite/macros.py
++++ b/robosuite/macros.py
+@@ -44,12 +44,12 @@ CONSOLE_LOGGING_LEVEL = "WARN"
+ FILE_LOGGING_LEVEL = None
+ 
+ # Override with macros from macros_private.py file, if it exists
+-try:
+-    from robosuite.macros_private import *
+-except ImportError:
+-    import robosuite
+-    from robosuite.utils.log_utils import ROBOSUITE_DEFAULT_LOGGER
+-
+-    ROBOSUITE_DEFAULT_LOGGER.warn("No private macro file found!")
+-    ROBOSUITE_DEFAULT_LOGGER.warn("It is recommended to use a private macro file")
+-    ROBOSUITE_DEFAULT_LOGGER.warn("To setup, run: python {}/scripts/setup_macros.py".format(robosuite.__path__[0]))
++# try:
++#     from robosuite.macros_private import *
++# except ImportError:
++#     import robosuite
++#     from robosuite.utils.log_utils import ROBOSUITE_DEFAULT_LOGGER
++
++#     ROBOSUITE_DEFAULT_LOGGER.warn("No private macro file found!")
++#     ROBOSUITE_DEFAULT_LOGGER.warn("It is recommended to use a private macro file")
++#     ROBOSUITE_DEFAULT_LOGGER.warn("To setup, run: python {}/scripts/setup_macros.py".format(robosuite.__path__[0]))
+diff --git a/robosuite/models/arenas/arena.py b/robosuite/models/arenas/arena.py
+index d274f9f5..7f2be52d 100644
+--- a/robosuite/models/arenas/arena.py
++++ b/robosuite/models/arenas/arena.py
+@@ -46,6 +46,21 @@ class Arena(MujocoXML):
+             new_pos = cur_pos + offset
+             node.set("pos", array_to_string(new_pos))
+ 
++    def get_camera(self, camera_name):
++        """
++        Returns the camera with @camera_name.
++
++        Args:
++            camera_name (str): Camera name to search for
++
++        Returns:
++            camera (Element): Camera element
++        """
++        # Determine if camera already exists
++        camera = find_elements(root=self.worldbody, tags="camera", attribs={
++                               "name": camera_name}, return_first=True)
++        return string_to_array(camera.get("pos")), string_to_array(camera.get("quat"))
++
+     def set_camera(self, camera_name, pos, quat, camera_attribs=None):
+         """
+         Sets a camera with @camera_name. If the camera already exists, then this overwrites its pos and quat values.
+diff --git a/robosuite/robots/single_arm.py b/robosuite/robots/single_arm.py
+index 598a168e..bbae18d6 100644
+--- a/robosuite/robots/single_arm.py
++++ b/robosuite/robots/single_arm.py
+@@ -310,6 +310,10 @@ class SingleArm(Manipulator):
+         def eef_quat(obs_cache):
+             return T.convert_quat(self.sim.data.get_body_xquat(self.robot_model.eef_name), to="xyzw")
+ 
++        @sensor(modality=modality)
++        def eef_rot(obs_cache):
++            return np.array(self.sim.data.site_xmat[self.eef_site_id]).flatten()
++
+         @sensor(modality=modality)
+         def eef_vel_lin(obs_cache):
+             return np.array(self.sim.data.get_body_xvelp(self.robot_model.eef_name))
+@@ -318,10 +322,11 @@ class SingleArm(Manipulator):
+         def eef_vel_ang(obs_cache):
+             return np.array(self.sim.data.get_body_xvelr(self.robot_model.eef_name))
+ 
+-        sensors = [eef_pos, eef_quat, eef_vel_lin, eef_vel_ang]
+-        names = [f"{pf}eef_pos", f"{pf}eef_quat", f"{pf}eef_vel_lin", f"{pf}eef_vel_ang"]
++        sensors = [eef_pos, eef_rot, eef_quat, eef_vel_lin, eef_vel_ang]
++        names = [f"{pf}eef_pos", f"{pf}eef_rot", f"{pf}eef_quat",
++                 f"{pf}eef_vel_lin", f"{pf}eef_vel_ang"]
+         # Exclude eef vel by default
+-        actives = [True, True, False, False]
++        actives = [True, True, True, False, False]
+ 
+         # add in gripper sensors if this robot has a gripper
+         if self.has_gripper:
+diff --git a/robosuite/utils/control_utils.py b/robosuite/utils/control_utils.py
+index 18cc0a6b..66a47765 100644
+--- a/robosuite/utils/control_utils.py
++++ b/robosuite/utils/control_utils.py
+@@ -1,4 +1,5 @@
+ import numpy as np
++from scipy.spatial.transform import Rotation as R
+ 
+ import robosuite.utils.transform_utils as trans
+ from robosuite.utils.numba import jit_decorator
+@@ -234,3 +235,130 @@ def set_goal_orientation(delta, current_orientation, orientation_limit=None, set
+         if limited:
+             goal_orientation = trans.euler2mat(np.array([euler[0], euler[1], euler[2]]))
+     return goal_orientation
++
++
++def set_goal_pose_from_relative_actions(
++    delta,
++    current_orientation,
++    current_position,
++    orientation_limit=None,
++    position_limit=None,
++    set_ori=None,
++    set_pos=None,
++):
++    """
++    Calculates and returns the desired goal orientation, clipping the result accordingly to @orientation_limits.
++    @delta and @current_orientation must be specified if a relative goal is requested, else @set_ori must be
++    an orientation matrix specified to define a global orientation
++
++    Args:
++        delta (np.array): Desired relative change in orientation, in axis-angle form [ax, ay, az]
++        current_orientation (np.array): Current orientation, in rotation matrix form
++        orientation_limit (None or np.array): 2d array defining the (min, max) limits of permissible orientation goal commands
++        set_ori (None or np.array): If set, will ignore @delta and set the goal orientation to this value
++
++    Returns:
++        np.array: calculated goal orientation in absolute coordinates
++
++    Raises:
++        ValueError: [Invalid orientation_limit shape]
++    """
++    # directly set orientation
++    delta_X, X = np.eye(4), np.eye(4)
++    delta_X[:3, :3] = R.from_rotvec(delta[3:]).as_matrix()
++    delta_X[:3, 3] = delta[:3]
++    #
++    X[:3, :3] = current_orientation
++    X[:3, 3] = current_position
++    #
++    goal_pose = X @ delta_X
++
++    if set_ori is not None:
++        goal_orientation = set_ori
++
++    # otherwise use delta to set goal orientation
++    else:
++        # convert axis-angle value to rotation matrix
++        goal_orientation = goal_pose[:3, :3]
++
++    # check for orientation limits
++    if np.array(orientation_limit).any():
++        if orientation_limit.shape != (2, 3):
++            raise ValueError(
++                "Orientation limit should be shaped (2,3) "
++                "but is instead: {}".format(orientation_limit.shape)
++            )
++
++        # Convert to euler angles for clipping
++        euler = trans.mat2euler(goal_orientation)
++
++        # Clip euler angles according to specified limits
++        limited = False
++        for idx in range(3):
++            if (
++                orientation_limit[0][idx] < orientation_limit[1][idx]
++            ):  # Normal angle sector meaning
++                if orientation_limit[0][idx] < euler[idx] < orientation_limit[1][idx]:
++                    continue
++                else:
++                    limited = True
++                    dist_to_lower = euler[idx] - orientation_limit[0][idx]
++                    if dist_to_lower > np.pi:
++                        dist_to_lower -= 2 * np.pi
++                    elif dist_to_lower < -np.pi:
++                        dist_to_lower += 2 * np.pi
++
++                    dist_to_higher = euler[idx] - orientation_limit[1][idx]
++                    if dist_to_lower > np.pi:
++                        dist_to_higher -= 2 * np.pi
++                    elif dist_to_lower < -np.pi:
++                        dist_to_higher += 2 * np.pi
++
++                    if dist_to_lower < dist_to_higher:
++                        euler[idx] = orientation_limit[0][idx]
++                    else:
++                        euler[idx] = orientation_limit[1][idx]
++            else:  # Inverted angle sector meaning
++                if (
++                    orientation_limit[0][idx] < euler[idx]
++                    or euler[idx] < orientation_limit[1][idx]
++                ):
++                    continue
++                else:
++                    limited = True
++                    dist_to_lower = euler[idx] - orientation_limit[0][idx]
++                    if dist_to_lower > np.pi:
++                        dist_to_lower -= 2 * np.pi
++                    elif dist_to_lower < -np.pi:
++                        dist_to_lower += 2 * np.pi
++
++                    dist_to_higher = euler[idx] - orientation_limit[1][idx]
++                    if dist_to_lower > np.pi:
++                        dist_to_higher -= 2 * np.pi
++                    elif dist_to_lower < -np.pi:
++                        dist_to_higher += 2 * np.pi
++
++                    if dist_to_lower < dist_to_higher:
++                        euler[idx] = orientation_limit[0][idx]
++                    else:
++                        euler[idx] = orientation_limit[1][idx]
++        if limited:
++            goal_orientation = trans.euler2mat(
++                np.array([euler[0], euler[1], euler[2]]))
++
++    n = len(current_position)
++    if set_pos is not None:
++        goal_position = set_pos
++    else:
++        goal_position = goal_pose[:3, 3]
++    if position_limit is not None:
++        if position_limit.shape != (2, n):
++            raise ValueError(
++                "Position limit should be shaped (2,{}) "
++                "but is instead: {}".format(n, position_limit.shape)
++            )
++
++        # Clip goal position
++        goal_position = np.clip(
++            goal_position, position_limit[0], position_limit[1])
++    return goal_orientation, goal_position
+diff --git a/robosuite/wrappers/__init__.py b/robosuite/wrappers/__init__.py
+index 282a66a0..f00d1af4 100644
+--- a/robosuite/wrappers/__init__.py
++++ b/robosuite/wrappers/__init__.py
+@@ -4,7 +4,7 @@ from robosuite.wrappers.demo_sampler_wrapper import DemoSamplerWrapper
+ from robosuite.wrappers.domain_randomization_wrapper import DomainRandomizationWrapper
+ from robosuite.wrappers.visualization_wrapper import VisualizationWrapper
+ 
+-try:
+-    from robosuite.wrappers.gym_wrapper import GymWrapper
+-except:
+-    print("Warning: make sure gym is installed if you want to use the GymWrapper.")
++# try:
++#     from robosuite.wrappers.gym_wrapper import GymWrapper
++# except:
++#     print("Warning: make sure gym is installed if you want to use the GymWrapper.")

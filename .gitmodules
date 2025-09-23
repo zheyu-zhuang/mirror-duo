@@ -1,0 +1,12 @@
+[submodule "external/equidiff"]
+	path = external/equidiff
+	url = https://github.com/pointW/equidiff
+[submodule "external/robomimic"]
+	path = external/robomimic
+	url = https://github.com/ARISE-Initiative/robomimic
+[submodule "external/robosuite"]
+	path = external/robosuite
+	url = https://github.com/ARISE-Initiative/robosuite
+[submodule "external/mimicgen"]
+	path = external/mimicgen
+	url = https://github.com/NVlabs/mimicgen
