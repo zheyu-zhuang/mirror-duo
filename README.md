@@ -25,13 +25,13 @@
 - **Plug-and-Play Integration**  
   Works seamlessly with [robomimic](https://github.com/ARISE-Initiative/robomimic) and [robosuite](https://github.com/ARISE-Initiative/robosuite).  
 
-This repository accompanies the paper, accepted by Conference on Robot Learning (CoRL) 2025  
+This repository accompanies the paper accepted at the **Conference on Robot Learning (CoRL) 2025**:
 
 > **MirrorDuo: Reflection-Consistent Visuomotor Learning from Mirrored Demonstration Pairs**  
 > Zheyu Zhuang\*¹, Ruiyu Wang\*¹, Giovanni Luca Marchetti², Florian T. Pokorny¹, Danica Kragic¹  
 > ¹ Division of Robotics, Perception and Learning, KTH Royal Institute of Technology, Stockholm, Sweden  
 > ² Department of Mathematics, KTH Royal Institute of Technology, Stockholm, Sweden  
-> \* Equal contribution  
+> \* Equal contribution
 
 ## Installation
 
