@@ -48,8 +48,8 @@ This repository accompanies the paper accepted at the **Conference on Robot Lear
 To ensure compatibility, submodules are pinned to specific branches.
     ```bash
     git clone --recurse-submodules https://github.com/zheyu-zhuang/mirror-duo.git
-    git submodule update --init --recursive
     cd mirror-duo
+    git submodule update --init --recursive
     ```
 4. Install environment: Use Mambaforge (strongly recommended):
     ```bash

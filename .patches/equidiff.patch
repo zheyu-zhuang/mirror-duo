@@ -1,3 +1,6 @@
+diff --git a/equi_diffpo/__init__.py b/equi_diffpo/__init__.py
+new file mode 100644
+index 0000000..e69de29
 diff --git a/equi_diffpo/common/robomimic_util.py b/equi_diffpo/common/robomimic_util.py
 index 030cc2e..e52e2dc 100644
 --- a/equi_diffpo/common/robomimic_util.py
