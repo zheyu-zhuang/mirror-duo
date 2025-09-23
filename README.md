@@ -1,7 +1,7 @@
 # MirrorDuo  
 [![Preprint PDF](https://img.shields.io/badge/Paper-PDF-red)](asset/preprint.pdf)
 [![Poster PDF](https://img.shields.io/badge/Poster-PDF-blue)](asset/poster.pdf) 
-
+![](asset/highlight.gif) | 
 **MirrorDuo** captures a simple idea: **moving left implies knowing how to move right**. We turn this intuition into a framework for image-based imitation learning in the SE(3) state–action space. By systematically mirroring images, robot states, and actions, MirrorDuo effectively doubles the training data without additional collection, improving data efficiency and policy robustness.  
 ## Key Features  
 
