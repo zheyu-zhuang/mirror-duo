@@ -129,7 +129,7 @@ python mirrorduo/mirrorduo/scripts/rerender_demos.py \
 - Coffee_D2_Mirror  
 - Coffee_D2_Agentview_Far  
 - Coffee_D2_Agentview_Far_Mirror  
-- Square_D1_Mirror  
+- Square_D0_Mirror  
 - Square_D0_Agentview_Far  
 - Square_D0_Agentview_Far_Mirror  
 

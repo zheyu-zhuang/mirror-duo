@@ -209,11 +209,9 @@ def mirror_object(X_C, obj_pos, obj_quat, rot_180=False):
 
 
 def mirror_object_placements(env, object_placements, mirror=False):
-    if not mirror:
-        return
-    X_C = env.get_agentview_extrinsics()
     for obj_pos, obj_quat, obj in object_placements.values():
         if mirror:
+            X_C = env.get_agentview_extrinsics()
             obj_pos, obj_quat = mirror_object(X_C, obj_pos, obj_quat)
         env.sim.data.set_joint_qpos(obj.joints[0], np.concatenate([obj_pos, obj_quat]))
 
