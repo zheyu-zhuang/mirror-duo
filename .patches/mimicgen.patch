@@ -794,7 +794,7 @@ index 3f3c359..2f81122 100644
                  reference=np.array((0, 0, 0.82)),
              ),
 diff --git a/mimicgen/envs/robosuite/stack.py b/mimicgen/envs/robosuite/stack.py
-index 6009e4f..1ea7cb5 100644
+index 6009e4f..67cc68c 100644
 --- a/mimicgen/envs/robosuite/stack.py
 +++ b/mimicgen/envs/robosuite/stack.py
 @@ -3,27 +3,27 @@
@@ -842,7 +842,7 @@ index 6009e4f..1ea7cb5 100644
          Stack.__init__(self, placement_initializer=placement_initializer, **kwargs)
  
      def edit_model_xml(self, xml_str):
-@@ -188,6 +190,20 @@ class Stack_D0(Stack, SingleArmEnv_MG):
+@@ -188,6 +190,19 @@ class Stack_D0(Stack, SingleArmEnv_MG):
              for k in ["cubeA", "cubeB"]
          }
  
@@ -857,13 +857,12 @@ index 6009e4f..1ea7cb5 100644
 +            # Sample from the placement initializer for all objects
 +            object_placements = self.placement_initializer.sample()
 +            # Loop through all objects and reset their positions
-+            mirror_object_placements(
-+                self.sim, object_placements, self.mirror_scene)
++            mirror_object_placements(self, object_placements, self.mirror_scene)
 +
  
  class Stack_D1(Stack_D0):
      """
-@@ -235,7 +251,7 @@ class StackThree(Stack_D0):
+@@ -235,7 +250,7 @@ class StackThree(Stack_D0):
      """
      Stack three cubes instead of two.
      """
@@ -872,7 +871,7 @@ index 6009e4f..1ea7cb5 100644
          assert "placement_initializer" not in kwargs, "this class defines its own placement initializer"
  
          bounds = self._get_initial_placement_bounds()
-@@ -258,6 +274,7 @@ class StackThree(Stack_D0):
+@@ -258,6 +273,7 @@ class StackThree(Stack_D0):
              z_offset=0.01,
          )
  
@@ -880,7 +879,7 @@ index 6009e4f..1ea7cb5 100644
          Stack.__init__(self, placement_initializer=placement_initializer, **kwargs)
  
      def reward(self, action=None):
-@@ -509,6 +526,7 @@ class StackThree_D1(StackThree_D0):
+@@ -509,6 +525,7 @@ class StackThree_D1(StackThree_D0):
      """
      Less z-rotation (for easier datagen) and much wider initialization bounds.
      """
@@ -888,7 +887,7 @@ index 6009e4f..1ea7cb5 100644
      def _load_arena(self):
          """
          Make default camera have full view of tabletop to account for larger init bounds.
-@@ -545,3 +563,22 @@ class StackThree_D1(StackThree_D0):
+@@ -545,3 +562,22 @@ class StackThree_D1(StackThree_D0):
              )
              for k in ["cubeA", "cubeB", "cubeC"]
          }
