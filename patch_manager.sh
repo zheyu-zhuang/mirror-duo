@@ -91,18 +91,6 @@ case "$COMMAND" in
 
     echo "Reinstalling Packages."
     set -e  # stop if anything fails
-
-    # Install external submodules in editable mode
-    pip install -e ./external/robosuite
-    pip install -e ./external/robomimic
-    pip install -e ./external/mimicgen
-    pip install -e ./external/equidiff
-
-    # replace mujoco version to 2.3.2
-    pip install mujoco==2.3.2
-
-    # Install your own package
-    pip install -e mirrorduo
     ;;
 
   *)
