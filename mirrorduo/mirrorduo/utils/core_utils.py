@@ -258,7 +258,7 @@ def extract_trajectory(env, initial_state, states, actions, mirror=False, reset_
     assert states.shape[0] == actions.shape[0]
 
     env.reset()
-    initial_state["model"] = env.env.sim.model.get_xml()
+    # initial_state["model"] = env.env.sim.model.get_xml()
     env.reset_to(initial_state)
 
     if mirror:
