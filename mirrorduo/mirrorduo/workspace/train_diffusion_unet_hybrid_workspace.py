@@ -66,16 +66,19 @@ class TrainDiffusionUnetHybridWorkspace(BaseWorkspace):
         if self.model.kwargs.get("pretrained", False):
             print("[INFO] Loading pretrained backbone weights")
             # Load pretrained model
-            global_lr = cfg.optimizer.lr 
+            global_lr = cfg.optimizer.lr
             # Assuming the global learning rate is defined in the config
             obs_encoder_params = list(self.model.obs_encoder.parameters())
             obs_encoder_param_set = set(obs_encoder_params)  # Convert to set for faster lookup
             other_params = [p for p in self.model.parameters() if p not in obs_encoder_param_set]
-          # configure training state
-          
+            # configure training state
+
             self.optimizer = torch.optim.AdamW(
                 params=[
-                    {"params": obs_encoder_params, "lr": global_lr * 0.1},  # 0.1 of global LR for obs_encoder
+                    {
+                        "params": obs_encoder_params,
+                        "lr": global_lr * 0.1,
+                    },  # 0.1 of global LR for obs_encoder
                     {"params": other_params, "lr": global_lr},  # Default LR for other parameters
                 ],
                 lr=global_lr,
@@ -104,15 +107,15 @@ class TrainDiffusionUnetHybridWorkspace(BaseWorkspace):
                 self.global_step += 1
 
         # configure dataset
-        dataset: BaseImageDataset
-        dataset = hydra.utils.instantiate(cfg.task.dataset)
-        assert isinstance(dataset, BaseImageDataset)
-        train_dataloader = DataLoader(dataset, **cfg.dataloader)
-        normalizer = dataset.get_normalizer()
+        train_dataset = hydra.utils.instantiate(cfg.task.dataset)
+        train_dataset.set_mode("train")
+        train_dataloader = DataLoader(train_dataset, **cfg.dataloader)
+        normalizer = train_dataset.get_normalizer()
 
         # configure validation dataset
-        val_dataset = dataset.get_validation_dataset()
-        val_dataloader = DataLoader(val_dataset, **cfg.val_dataloader)
+        eval_dataset = hydra.utils.instantiate(cfg.task.dataset)
+        eval_dataset.set_mode("eval")
+        val_dataloader = DataLoader(eval_dataset, **cfg.val_dataloader)
 
         self.model.set_normalizer(normalizer)
         if cfg.training.use_ema:
@@ -248,59 +251,59 @@ class TrainDiffusionUnetHybridWorkspace(BaseWorkspace):
                 policy.eval()
 
                 # run rollout
-                if (self.epoch % cfg.training.rollout_every) == 0:
+                if (self.epoch % cfg.training.rollout_every) == 0 and self.epoch != 0:
                     runner_log = env_runner.run(policy)
                     # log all
                     step_log.update(runner_log)
 
-                # run validation
-                if (self.epoch % cfg.training.val_every) == 0:
-                    with torch.no_grad():
-                        val_losses = list()
-                        with tqdm.tqdm(
-                            val_dataloader,
-                            desc=f"Validation epoch {self.epoch}",
-                            leave=False,
-                            mininterval=cfg.training.tqdm_interval_sec,
-                        ) as tepoch:
-                            for batch_idx, batch in enumerate(tepoch):
-                                batch = dict_apply(
-                                    batch, lambda x: x.to(device, non_blocking=True)
-                                )
-                                loss = self.model.compute_loss(batch)
-                                val_losses.append(loss)
-                                if (cfg.training.max_val_steps is not None) and batch_idx >= (
-                                    cfg.training.max_val_steps - 1
-                                ):
-                                    break
-                        if len(val_losses) > 0:
-                            val_loss = torch.mean(torch.tensor(val_losses)).item()
-                            # log epoch average validation loss
-                            step_log["val_loss"] = val_loss
+                # # run validation
+                # if (self.epoch % cfg.training.val_every) == 0:
+                #     with torch.no_grad():
+                #         val_losses = list()
+                #         with tqdm.tqdm(
+                #             val_dataloader,
+                #             desc=f"Validation epoch {self.epoch}",
+                #             leave=False,
+                #             mininterval=cfg.training.tqdm_interval_sec,
+                #         ) as tepoch:
+                #             for batch_idx, batch in enumerate(tepoch):
+                #                 batch = dict_apply(
+                #                     batch, lambda x: x.to(device, non_blocking=True)
+                #                 )
+                #                 loss = self.model.compute_loss(batch)
+                #                 val_losses.append(loss)
+                #                 if (cfg.training.max_val_steps is not None) and batch_idx >= (
+                #                     cfg.training.max_val_steps - 1
+                #                 ):
+                #                     break
+                #         if len(val_losses) > 0:
+                #             val_loss = torch.mean(torch.tensor(val_losses)).item()
+                #             # log epoch average validation loss
+                #             step_log["val_loss"] = val_loss
 
-                # run diffusion sampling on a training batch
-                if (self.epoch % cfg.training.sample_every) == 0:
-                    with torch.no_grad():
-                        # sample trajectory from training set, and evaluate difference
-                        batch = dict_apply(
-                            train_sampling_batch, lambda x: x.to(device, non_blocking=True)
-                        )
-                        obs_dict = batch["obs"]
-                        gt_action = batch["action"]
+                # # run diffusion sampling on a training batch
+                # if (self.epoch % cfg.training.sample_every) == 0:
+                #     with torch.no_grad():
+                #         # sample trajectory from training set, and evaluate difference
+                #         batch = dict_apply(
+                #             train_sampling_batch, lambda x: x.to(device, non_blocking=True)
+                #         )
+                #         obs_dict = batch["obs"]
+                #         gt_action = batch["action"]
 
-                        result = policy.predict_action(obs_dict)
-                        pred_action = result["action_pred"]
-                        mse = torch.nn.functional.mse_loss(pred_action, gt_action)
-                        step_log["train_action_mse_error"] = mse.item()
-                        del batch
-                        del obs_dict
-                        del gt_action
-                        del result
-                        del pred_action
-                        del mse
+                #         result = policy.predict_action(obs_dict)
+                #         pred_action = result["action_pred"]
+                #         mse = torch.nn.functional.mse_loss(pred_action, gt_action)
+                #         step_log["train_action_mse_error"] = mse.item()
+                #         del batch
+                #         del obs_dict
+                #         del gt_action
+                #         del result
+                #         del pred_action
+                #         del mse
 
                 # checkpoint
-                if (self.epoch % cfg.training.checkpoint_every) == 0:
+                if (self.epoch % cfg.training.checkpoint_every) == 0 and self.epoch != 0:
                     # checkpointing
                     if cfg.checkpoint.save_last_ckpt:
                         self.save_checkpoint()

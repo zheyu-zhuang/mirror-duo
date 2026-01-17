@@ -273,9 +273,7 @@ class DiffusionUnetHybridImagePolicy(BaseImagePolicy):
         action_pred = self.normalizer["action"].unnormalize(naction_pred)
 
         # get action
-        start = To - 1
-        end = start + self.n_action_steps
-        action = action_pred[:, start:end]
+        action = action_pred[:, :self.n_action_steps]
 
         result = {"action": action, "action_pred": action_pred}
         return result

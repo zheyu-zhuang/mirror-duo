@@ -383,11 +383,11 @@ class MirrorDuoRobomimicImageRunner(BaseImageRunner):
             max_rewards[prefix].append(max_reward)
             log_data[prefix + f"sim_max_reward_{seed}"] = max_reward
 
-            # visualize sim
-            video_path = all_video_paths[i]
-            if video_path is not None:
-                sim_video = wandb.Video(video_path)
-                log_data[prefix + f"sim_video_{seed}"] = sim_video
+            # # visualize sim
+            # video_path = all_video_paths[i]
+            # if video_path is not None:
+            #     sim_video = wandb.Video(video_path)
+            #     log_data[prefix + f"sim_video_{seed}"] = sim_video
 
         # log aggregate metrics
         for prefix, value in max_rewards.items():

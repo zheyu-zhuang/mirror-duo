@@ -247,73 +247,97 @@ def worker(x):
 
 @click.command()
 @click.option("-i", "--input_file", required=True, help="input hdf5 path")
-@click.option("-o", "--output", required=True, help="output hdf5 path")
+@click.option("-o", "--output", default=None, help="output hdf5 path (default: write in-place)")
 @click.option("-e", "--eval_dir", default=None, help="directory to output evaluation metrics")
 @click.option("-b", "--batch_size", default=None, type=int)
 @click.option("-n", "--num_demos", default=None, type=int)
 @click.option("-a", "--action_mode", default="default", type=str)
 def main(input_file, output, eval_dir, num_demos, batch_size, action_mode):
-    input_file, output = pathlib.Path(input_file).expanduser(), pathlib.Path(output).expanduser()
-    assert input_file.is_file() and output.parent.is_dir() and not output.is_dir()
+    input_file = pathlib.Path(input_file).expanduser().resolve()
+    if not input_file.is_file():
+        raise FileNotFoundError(f"input_file not found: {input_file}")
+
+    # output: default in-place
+    if output is None:
+        output_path = input_file
+    else:
+        output_path = pathlib.Path(output).expanduser().resolve()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
     do_eval = bool(eval_dir)
     if do_eval:
-        eval_dir = pathlib.Path(eval_dir).expanduser()
-        assert eval_dir.parent.exists()
+        eval_dir = pathlib.Path(eval_dir).expanduser().resolve()
+        eval_dir.mkdir(parents=True, exist_ok=True)
 
-    converter = RobomimicActionConverter(input_file, action_mode=action_mode)
+    # Read-only converter (safe to construct in main)
+    converter = RobomimicActionConverter(str(input_file), action_mode=action_mode)
     total_demos = len(converter)
 
-    # Batch jobs in chunks of `batch_size`
     if num_demos is None:
         num_demos = total_demos
-    batch_size = num_demos if batch_size is None else batch_size
+    num_demos = int(num_demos)
+    if num_demos < 1 or num_demos > total_demos:
+        raise ValueError(f"num_demos must be in [1, {total_demos}], got {num_demos}")
+
+    batch_size = num_demos if batch_size is None else int(batch_size)
+    if batch_size < 1:
+        raise ValueError(f"batch_size must be >= 1, got {batch_size}")
+
     all_indices = list(range(num_demos))
     results = []
 
+    # Run workers in batches. Each worker opens HDF5 read-only.
     for i in range(0, num_demos, batch_size):
         batch = all_indices[i : i + batch_size]
         print(
-            f"Processing batch {i // batch_size + 1} / {(num_demos + batch_size - 1) // batch_size}..."
+            f"Processing batch {i // batch_size + 1} / {(num_demos + batch_size - 1) // batch_size} "
+            f"(n={len(batch)})..."
         )
-
-        with multiprocessing.Pool(processes=batch_size) as pool:
+        with multiprocessing.Pool(processes=min(len(batch), batch_size)) as pool:
             batch_results = pool.map(
-                worker, [(input_file, action_mode, idx, do_eval) for idx in batch]
+                worker,
+                [(str(input_file), action_mode, idx, do_eval) for idx in batch],
             )
-            results.extend(batch_results)
+        results.extend(batch_results)
 
-    # If output file is different, copy and open new h5py.File
-    if input_file != output:
-        shutil.copy(str(input_file), str(output))
-        out_file = h5py.File(str(output), "r+")
-    else:
-        out_file = converter.file  # already opened
+    try:
+        converter.file.close()
+    except Exception:
+        pass
 
-    for i, (converted_actions, robot_eef_rots, _) in enumerate(
-        tqdm(results, desc="Writing to output")
-    ):
-        demo = out_file[f"data/demo_{i}"]
-        for action_mode_, actions_ in converted_actions.items():
-            if action_mode_ == "default":
-                continue
-            act_name = get_action_key(action_mode_)
-            if act_name in demo:
-                del demo[act_name]
-            demo.create_dataset(act_name, data=actions_)
+    # If writing to a different file, copy first, then open r+
+    if output is not None and output_path != input_file:
+        shutil.copy2(str(input_file), str(output_path))
 
-        for bot_idx in range(robot_eef_rots.shape[1]):
-            key = f"robot{bot_idx}_eef_rot"
-            path = f"data/demo_{i}/obs/{key}"
-            if key in demo["obs"]:
-                demo["obs"][key][:] = robot_eef_rots[:, bot_idx]
-            else:
-                out_file.create_dataset(path, data=robot_eef_rots[:, bot_idx])
+    with h5py.File(str(output_path), "r+") as out_file:
+        for i, (converted_actions, robot_eef_rots, _) in enumerate(
+            tqdm(results, desc="Writing actions", total=len(results))
+        ):
+            demo = out_file[f"data/demo_{i}"]
+
+            # write converted action datasets
+            for mode, actions_ in converted_actions.items():
+                if mode == "default":
+                    continue
+                act_name = get_action_key(mode)
+                if act_name in demo:
+                    del demo[act_name]
+                demo.create_dataset(act_name, data=actions_)
+
+            # write robot eef rotations into obs
+            obs_grp = demo["obs"]
+            for bot_idx in range(robot_eef_rots.shape[1]):
+                key = f"robot{bot_idx}_eef_rot"
+                if key in obs_grp:
+                    obs_grp[key][...] = robot_eef_rots[:, bot_idx]
+                else:
+                    obs_grp.create_dataset(key, data=robot_eef_rots[:, bot_idx])
+
+        out_file.flush()
 
     if do_eval:
-        eval_dir.mkdir(parents=False, exist_ok=True)
         infos = [info for *_, info in results]
-        pickle.dump(infos, eval_dir.joinpath("error_stats.pkl").open("wb"))
+        pickle.dump(infos, (eval_dir / "error_stats.pkl").open("wb"))
 
         metrics_dicts = {m: collections.defaultdict(list) for m in ["pos", "rot"]}
         for info in infos:

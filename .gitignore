@@ -9,3 +9,4 @@ submit_jobs.sh
 cluster_logs
 **.out
 **.err
+wandb/
