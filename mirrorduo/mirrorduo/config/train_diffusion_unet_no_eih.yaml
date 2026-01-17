@@ -27,7 +27,7 @@ dataset_obs_steps: ${n_obs_steps}
 past_action_visible: False
 obs_as_global_cond: True
 dataset: mirrorduo.dataset.mimicgen_dataset.MimicGenDataset
-dataset_path: data/${task_name}/${task_name}_mirrorduo.hdf5
+dataset_path: datasets/${task_name}/${task_name}.hdf5
 n_envs: 56
 env_name: null
 
@@ -43,7 +43,7 @@ robo_augmentor:
     warmup_epochs: ${eval:'4000 / ${n_demo}'}
     input_shape: [84, 84]
     blend_alpha: 0.5
-    background_path: 'data/backgrounds'
+    background_path: 'datasets/backgrounds'
 
 policy:
   _target_: mirrorduo.policy.diffusion_unet_hybrid_image_policy.DiffusionUnetHybridImagePolicy
@@ -150,7 +150,7 @@ checkpoint:
   save_last_snapshot: False
 
 multi_run:
-  run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  run_dir: datasets/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
   wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
 
 hydra:

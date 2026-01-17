@@ -24,7 +24,7 @@ n_latency_steps: 0
 dataset_obs_steps: ${n_obs_steps}
 past_action_visible: False
 dataset: mirrorduo.dataset.robomimic_replay_image_mirrorduo_dataset.RobomimicReplayMirrorDuoImageDataset
-dataset_path: data/${task_name}/${task_name}_mirrorduo.hdf5
+dataset_path: datasets/${task_name}/${task_name}.hdf5
 n_envs: 56
 env_name: null
 
@@ -40,7 +40,7 @@ robo_augmentor:
     warmup_epochs: ${eval:'4000 / ${n_demo}'}
     input_shape: [84, 84]
     blend_alpha: 0.75
-    background_path: 'data/backgrounds'
+    background_path: 'datasets/backgrounds'
 
 policy:
   _target_: mirrorduo.policy.mirrorduo_diffusion_image_policy.MirrorDuoDiffusionImagePolicy

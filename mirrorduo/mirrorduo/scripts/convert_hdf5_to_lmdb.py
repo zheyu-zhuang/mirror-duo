@@ -325,7 +325,7 @@ def _default_cache_dir_from_hdf5(hdf5_path: Path) -> Path:
         datasets/<task>/<name>.hdf5 -> <output_root>/<task>/<name>_lmdb
     """
     stem = hdf5_path.stem
-    return hdf5_path.parent / f"{stem}_84_lmdb"
+    return hdf5_path.parent / f"{stem}_lowres_lmdb"
 
 
 def _is_done(cache_dir: Path) -> bool:
