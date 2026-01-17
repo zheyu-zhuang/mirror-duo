@@ -106,8 +106,6 @@ class MirrorDuoRobomimicImageRunner(BaseImageRunner):
 
         rotation_transformer = RotationTransformer("axis_angle", "rotation_6d")
 
-        self.center_agentview = False
-
         default_shape_meta = {
             "obs": {
                 "agentview_image": {
@@ -132,7 +130,10 @@ class MirrorDuoRobomimicImageRunner(BaseImageRunner):
                 "shape": [10],
             },
         }
-        # change tcp_centered to agentview_image for correct rendering
+
+        has_eye_in_hand = "robot0_eye_in_hand_image" in shape_meta["obs"]
+        if not has_eye_in_hand:
+            del default_shape_meta["obs"]["robot0_eye_in_hand_image"]
 
         env_temp = create_env(env_meta=env_meta, shape_meta=default_shape_meta)
         self.camera_matrix = get_camera_transform_matrix(
