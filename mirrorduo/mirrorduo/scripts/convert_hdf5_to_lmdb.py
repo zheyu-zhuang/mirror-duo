@@ -317,37 +317,94 @@ def build_lmdb_cache_from_hdf5(
     print(f"[built] cache_dir={cache_dir} demos={meta['n_demo']} samples={meta['n_samples']}")
 
 
+def _default_cache_dir_from_hdf5(hdf5_path: Path) -> Path:
+    """
+    Default next-to-file:
+        datasets/<task>/<name>.hdf5 -> datasets/<task>/<name>_lmdb
+    Optional centralized output:
+        datasets/<task>/<name>.hdf5 -> <output_root>/<task>/<name>_lmdb
+    """
+    stem = hdf5_path.stem
+    return hdf5_path.parent / f"{stem}_84_lmdb"
+
+
+def _is_done(cache_dir: Path) -> bool:
+    return (cache_dir / "build_done.flag").exists()
+
+
+def build_all_under_root(
+    datasets_root: str,
+    glob_pattern: str = "**/*.hdf5",
+    force: bool = False,
+    dry_run: bool = False,
+    **builder_kwargs,
+):
+    datasets_root_p = Path(datasets_root).expanduser().resolve()
+    if not datasets_root_p.exists():
+        raise FileNotFoundError(f"datasets_root not found: {datasets_root_p}")
+
+    hdf5_files = sorted(datasets_root_p.glob(glob_pattern))
+    if not hdf5_files:
+        print(f"[WARN] No .hdf5 found under {datasets_root_p} with glob='{glob_pattern}'")
+        return
+
+    n_ok, n_skip, n_fail = 0, 0, 0
+    print(f"[INFO] Found {len(hdf5_files)} hdf5 files under {datasets_root_p}")
+
+    for h5 in hdf5_files:
+        cache_dir = _default_cache_dir_from_hdf5(h5)
+
+        if _is_done(cache_dir) and not force:
+            print(f"[SKIP] build_done.flag exists: {h5} -> {cache_dir}")
+            n_skip += 1
+            continue
+
+        print(f"[RUN ] {h5} -> {cache_dir}")
+        if dry_run:
+            continue
+
+        try:
+            build_lmdb_cache_from_hdf5(
+                hdf5_path=str(h5),
+                cache_dir=str(cache_dir),
+                **builder_kwargs,
+            )
+            n_ok += 1
+        except Exception as e:
+            n_fail += 1
+            print(f"[FAIL] {h5}\n       {type(e).__name__}: {e}")
+
+    print(f"\n[SUMMARY] ok={n_ok} skip={n_skip} fail={n_fail} total={len(hdf5_files)}")
+
+
 if __name__ == "__main__":
     import argparse
 
-    def _default_hdf5_path(task_name: str) -> str:
-        # data/{task}/{task}.hdf5
-        task = str(task_name)
-        return str(Path("data") / task / f"{task}_mirrorduo.hdf5")
-
-    def _default_cache_dir(task_name: str) -> str:
-        # data/{task}/{task}_lmdb
-        task = str(task_name)
-        return str(Path("data") / task / f"{task}_lmdb")
-
     ap = argparse.ArgumentParser()
-    ap.add_argument("--task_name", type=str, required=True)
+    ap.add_argument("--datasets_root", type=str, required=True)
+    ap.add_argument("--glob", type=str, default="**/*.hdf5")
+    ap.add_argument("--force", action="store_true")
+    ap.add_argument("--dry_run", action="store_true")
+
+    # forward your builder args
+    ap.add_argument("--image_size", type=int, default=84)
+    ap.add_argument("--jpeg_quality", type=int, default=90)
+    ap.add_argument("--lmdb_map_size_gb", type=int, default=32)
+    ap.add_argument("--commit_every", type=int, default=5000)
+
     args = ap.parse_args()
 
-    hdf5_file_path = _default_hdf5_path(args.task_name)
-    cache_dir = _default_cache_dir(args.task_name)
-
-    if not os.path.exists(hdf5_file_path):
-        raise FileNotFoundError(f"Input HDF5 not found: {hdf5_file_path}")
-
-    build_lmdb_cache_from_hdf5(
-        hdf5_path=hdf5_file_path,
-        cache_dir=cache_dir,
+    build_all_under_root(
+        datasets_root=args.datasets_root,
+        glob_pattern=args.glob,
+        force=args.force,
+        dry_run=args.dry_run,
         shape_meta=SHAPE_META,
         n_demo=None,
         start_index=0,
-        image_size=84,
-        jpeg_quality=90,
-        lmdb_map_size_gb=32,
-        commit_every=5000,
+        image_size=args.image_size,
+        jpeg_quality=args.jpeg_quality,
+        lmdb_map_size_gb=args.lmdb_map_size_gb,
+        commit_every=args.commit_every,
+        keep_failed=True,
     )

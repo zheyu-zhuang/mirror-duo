@@ -10,3 +10,4 @@ cluster_logs
 **.out
 **.err
 wandb/
+datasets

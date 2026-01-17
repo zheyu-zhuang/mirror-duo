@@ -83,7 +83,7 @@ class MimicGenDataset(torch.utils.data.Dataset):
         folder = os.path.dirname(os.path.abspath(os.path.expanduser(dataset_path)))
         parent_name = os.path.basename(folder)
         if cache_dir is None:
-            cache_dir = os.path.join(folder, f"{parent_name}_lmdb")
+            cache_dir = os.path.join(folder, f"{parent_name}_84_lmdb")
 
         self.cache_dir = cache_dir
         self.lmdb_path = os.path.join(self.cache_dir, "images.lmdb")
