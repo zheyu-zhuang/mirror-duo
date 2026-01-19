@@ -224,7 +224,7 @@ index f7a72a7..2c40527 100644
                      self.sim.model.body_quat[body_id] = obj_quat
                  else:
 diff --git a/mimicgen/envs/robosuite/nut_assembly.py b/mimicgen/envs/robosuite/nut_assembly.py
-index 3f3c359..2f81122 100644
+index 3f3c359..04b19ce 100644
 --- a/mimicgen/envs/robosuite/nut_assembly.py
 +++ b/mimicgen/envs/robosuite/nut_assembly.py
 @@ -18,11 +18,20 @@ from robosuite.utils import RandomizationError
@@ -591,7 +591,7 @@ index 3f3c359..2f81122 100644
              # Loop through all objects and reset their positions
 -            for obj_pos, obj_quat, obj in object_placements.values():
 -                self.sim.data.set_joint_qpos(obj.joints[0], np.concatenate([np.array(obj_pos), np.array(obj_quat)]))
-+            mirror_object_placements(self.sim, object_placements, self.mirror_scene)
++            mirror_object_placements(self, object_placements, self.mirror_scene)
  
          # Move objects out of the scene depending on the mode
          nut_names = {nut.name for nut in self.nuts}
